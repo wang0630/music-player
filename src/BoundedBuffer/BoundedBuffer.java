@@ -1,3 +1,5 @@
+package BoundedBuffer;
+
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
@@ -8,13 +10,13 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 
-class BoundedBuffer extends JFrame implements KeyListener
+public class BoundedBuffer extends JFrame implements KeyListener
 {
     // class.getResource will load the file relative to the classPath of this class
     // In which case from out/production/sd_music_recreate
     private String wavFile = BoundedBuffer.class.getResource("/example.wav").getFile(); //Enter name of wav file here eg: song.wav **Must be in same directory as player.java**
-
     private File fileIn = new File(wavFile);
+
     private AudioInputStream audioStream;
     private AudioFormat format;
     private DataLine.Info info;
@@ -38,7 +40,7 @@ class BoundedBuffer extends JFrame implements KeyListener
 
     public BoundedBuffer() //GUI from player JFrame
     {
-        setTitle("Music Player");
+        setTitle("Music Player.Player");
         Panel p = new Panel();
         l1 = new JLabel ("NOW PLAYING: " + fileIn, SwingConstants.CENTER);
         l2 = new JLabel("<html><br/>MUSIC PLAYER CONTROLS<br/><br/> Stop: x <br/>Higher Volume: q <br/>Lower Volume: a <br/>Pause: p <br/>Resume: r <br/>Mute: m <br/>Unmute: u<br/><br/></html>", SwingConstants.CENTER);
@@ -63,6 +65,7 @@ class BoundedBuffer extends JFrame implements KeyListener
     {
         audioStream = AudioSystem.getAudioInputStream(fileIn);
         format = audioStream.getFormat();
+        System.out.println(SourceDataLine.class);
         info = new DataLine.Info(SourceDataLine.class, format);
         line = (SourceDataLine) AudioSystem.getLine(info);
         line.open(format);
