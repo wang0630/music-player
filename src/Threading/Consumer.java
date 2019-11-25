@@ -2,21 +2,14 @@ package Threading;
 
 import BoundedBuffer.BoundedBuffer;
 
-public class Consumer extends Thread //consumer thread that writes audio to device
+public class Consumer extends AbstractThreading //consumer thread that writes audio to device
 {
-    private BoundedBuffer boundedBuffer;
-    private boolean alive = true;
-
-    public Consumer(BoundedBuffer bb)
-    {
-        boundedBuffer = bb;
+    public Consumer(BoundedBuffer bb) {
+        super(bb);
     }
 
-    public void run()
-    {
-        while(alive) //loops until alive = false is return (when 'x' is entered or song ends)
-        {
-            alive = boundedBuffer.removeChunk();
-        }
+    @Override
+    public boolean threadingAction() {
+        return boundedBuffer.removeChunk();
     }
 }
