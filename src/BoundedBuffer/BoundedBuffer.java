@@ -24,23 +24,28 @@ public class BoundedBuffer extends JFrame implements KeyListener
     float volume = 2.0f;
     private boolean paused = false;
     private boolean muted = false;
+    // true indicates the data is ready to play
     private boolean dataAvailable = false;
+    // true if the buffer still has spaces for data to be written
     private boolean roomAvailable = true;
+
     private boolean alive = true;
-    private int buffersize = 282240;
+    private int bufferSize = 282240;
+    
     private int oneSecond = 28224;
     private int nextIn;
     private int nextOut;
     private int bytesRead;
     private int bytesWritten;
     private byte[] audioChunk;
+
     private JLabel l1;
     private JLabel l2;
     private JLabel l3;
 
     public BoundedBuffer() //GUI from player JFrame
     {
-        setTitle("Music Player.Player");
+        setTitle("Music Player");
         Panel p = new Panel();
         l1 = new JLabel ("NOW PLAYING: " + fileIn, SwingConstants.CENTER);
         l2 = new JLabel("<html><br/>MUSIC PLAYER CONTROLS<br/><br/> Stop: x <br/>Higher Volume: q <br/>Lower Volume: a <br/>Pause: p <br/>Resume: r <br/>Mute: m <br/>Unmute: u<br/><br/></html>", SwingConstants.CENTER);
@@ -49,8 +54,8 @@ public class BoundedBuffer extends JFrame implements KeyListener
         p.add(l2);
         p.add(l3);
         add(p);
-        addKeyListener ( this ) ;
-        setSize (280,400 );
+        addKeyListener (this) ;
+        setSize (400,400 );
         setVisible(true);
         addWindowListener(new WindowAdapter()
         {
@@ -72,7 +77,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
         line.start();
     }
 
-    public void keyPressed ( KeyEvent e) //checks for key presses
+    public void keyPressed (KeyEvent e) //checks for key presses
     {
         char control = e.getKeyChar();
 
@@ -152,13 +157,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
             }
         }
     }
-    public void keyTyped ( KeyEvent e ){}
-    public void keyReleased ( KeyEvent e ){}
 
-    public static void main (String[]args ) //creates GUI for player
-    {
-        new BoundedBuffer();
-    }
 
     public synchronized boolean insertChunk()
     {
@@ -166,16 +165,16 @@ public class BoundedBuffer extends JFrame implements KeyListener
         {
             try
             {
-                wait();//waits until all of data is written (played)
+                wait(); // waits until all of data is written (played)
             }
             catch (InterruptedException e) { }
         }
 
         try
         {
-            audioChunk = new byte[buffersize];
+            audioChunk = new byte[bufferSize];
 
-            while(nextIn != buffersize && alive)
+            while(nextIn != bufferSize && alive)
             {
                 if((bytesRead = audioStream.read(audioChunk, nextIn, oneSecond)) == -1 && paused == false)//reads in 10 one second chunks, if nothing is read, terminate thread
                 {
@@ -191,12 +190,16 @@ public class BoundedBuffer extends JFrame implements KeyListener
         }
         catch (IOException e) { }
 
-        dataAvailable = true; //audio data is available to be written
-        roomAvailable = false; //no room for audio data to be read in
-        notifyAll(); //notify threads
+        dataAvailable = true; // audio data is available to be written
+        roomAvailable = false; // no room for audio data to be read in
+        notifyAll(); // notify threads
 
         return alive; // alive, thread will loop if true
     }
+
+    // We must implement these two functions since BoundedBuffer implements KeyListener
+    public void keyTyped ( KeyEvent e ){}
+    public void keyReleased ( KeyEvent e ){}
 
     public synchronized boolean removeChunk()
     {
@@ -204,13 +207,12 @@ public class BoundedBuffer extends JFrame implements KeyListener
         {
             try
             {
-                wait();//waits until data is available to be written
+                wait(); // waits until data is available to be written
             }
             catch (InterruptedException e) { }
         }
 
-
-        while(nextOut != buffersize && alive)
+        while(nextOut != bufferSize && alive)
         {
             if(paused == false)
             {
