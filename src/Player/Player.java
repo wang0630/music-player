@@ -1,7 +1,8 @@
-package Player;//Multi-threaded music player that plays a WAV file
-//Threading.Producer thread reads in 10 seconds of file
-//Threading.Consumer thread writes the 10 seconds to audio device
-//@author  Conor Hughes
+package Player;
+// Multi-threaded music player that plays a WAV file
+// Threading.Producer thread reads in 10 seconds of file
+// Threading.Consumer thread writes the 10 seconds to audio device
+// @author Conor Hughes
 import BoundedBuffer.BoundedBuffer;
 import Threading.Consumer;
 import Threading.Producer;

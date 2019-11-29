@@ -5,6 +5,7 @@ import PanelControl.*;
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.desktop.ScreenSleepEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
@@ -24,15 +25,13 @@ public class BoundedBuffer extends JFrame implements KeyListener
     private AudioFormat format;
     private DataLine.Info info;
     private SourceDataLine line;
-    private boolean paused = false;
-    private boolean muted = false;
 
     // true indicates the data is ready to play
     private boolean dataAvailable = false;
     // true if the buffer still has spaces for data to be written
     private boolean roomAvailable = true;
 
-    private boolean alive = true;
+    public static boolean alive = true;
     private int bufferSize = 282240;
     
     private int oneSecond = 28224;
@@ -43,7 +42,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
     private byte[] audioChunk;
 
     // The keyEvent for the control
-    HashMap<Character, PanelControl> panelControlMap = new HashMap<Character, PanelControl>();
+    private HashMap<Character, PanelControl> panelControlMap = new HashMap<Character, PanelControl>();
 
 
     // Make labels static, allow PanelControl package to access it
@@ -56,7 +55,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
         setTitle("Music Player");
         Panel p = new Panel();
         l1 = new JLabel ("NOW PLAYING: " + fileIn, SwingConstants.CENTER);
-        l2 = new JLabel("<html><br/>MUSIC PLAYER CONTROLS<br/><br/> Stop: x <br/>Higher Volume: q <br/>Lower Volume: a <br/>Pause: p <br/>Resume: r <br/>Mute: m <br/>Unmute: u<br/><br/></html>", SwingConstants.CENTER);
+        l2 = new JLabel("<html><br/>MUSIC PLAYER CONTROLS<br/><br/> Stop: e <br/>Higher Volume: f <br/>Lower Volume: d <br/>Pause: p <br/>Resume: r <br/>Mute: m <br/>Unmute: u<br/><br/></html>", SwingConstants.CENTER);
         l3 = new JLabel("CURRENT VOLUME: " + 2.0f, SwingConstants.CENTER);
         p.add(l1);
         p.add(l2);
@@ -72,9 +71,15 @@ public class BoundedBuffer extends JFrame implements KeyListener
                 System.exit(0);
             }
         });
+
         // Add panelControl to the map
         setPanelControlMap('f', new VolumeUp());
         setPanelControlMap('d', new VolumeDown());
+        setPanelControlMap('m', new Mute());
+        setPanelControlMap('u', new Unmute());
+        setPanelControlMap('p', new Pause());
+        setPanelControlMap('r', new Resume());
+        setPanelControlMap('e', new Exit());
     }
 
     public void readFile() throws UnsupportedAudioFileException, IOException,  LineUnavailableException //reads in file, format and info
@@ -93,67 +98,15 @@ public class BoundedBuffer extends JFrame implements KeyListener
     }
 
     private void doPanelControl(char key) {
-
-        panelControlMap.get(key).execute(line);
+        if (panelControlMap.containsKey(key)) {
+            panelControlMap.get(key).execute(line);
+        }
     }
 
     public void keyPressed (KeyEvent e) //checks for key presses
     {
         char control = e.getKeyChar();
-        if(control == 'x') //ends program, returns alive = false, stops threads
-        {
-            l2.setText("Thanks");
-            l3.setText("For");
-            l3.setText("Listening");
-            alive = false; //drains, stops and closes line. returns alive = false to end thread
-        }
-
-        if(control == 'f') //increases volume, stops at 60.0f as it is the maximum value
-        {
-            doPanelControl('f');
-        }
-
-        if(control == 'a') //decreases volume, stops at -80.0f as it is the minimum value
-        {
-
-        }
-
-        if(control == 'm') //mutes line until 'u' is entered
-        {
-            BooleanControl muteControl = (BooleanControl) line.getControl(BooleanControl.Type.MUTE);
-            muteControl.setValue(true);
-            muted = true;
-            l3.setText("SONG MUTED!");
-        }
-
-        if(control == 'u') //unmutes line
-        {
-            BooleanControl muteControl = (BooleanControl) line.getControl(BooleanControl.Type.MUTE);
-            muteControl.setValue(false);
-            muted = false;
-//            l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
-        }
-
-        if(control == 'p') //pauses line, until 'r' is entered, make boolean paused = true
-        {
-            line.stop();
-            paused = true;
-            l3.setText("SONG PAUSED!");
-        }
-
-        if(control == 'r') //resumes line, make boolean paused = false
-        {
-            line.start();
-            paused = false;
-            if(muted == true)
-            {
-                l3.setText("SONG MUTED!");
-            }
-            else
-            {
-//                l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
-            }
-        }
+        doPanelControl(control);
     }
 
 
@@ -174,13 +127,13 @@ public class BoundedBuffer extends JFrame implements KeyListener
             // If the chunk is full(10 secs), we break this while loop
             while(nextIn != bufferSize && alive)
             {
-                if((bytesRead = audioStream.read(audioChunk, nextIn, oneSecond)) == -1 && paused == false)//reads in 10 one second chunks, if nothing is read, terminate thread
+                if((bytesRead = audioStream.read(audioChunk, nextIn, oneSecond)) == -1 && !PlayProgress.paused)//reads in 10 one second chunks, if nothing is read, terminate thread
                 {
                     l2.setText("Thanks For Listening");
                     line.drain();
                     line.stop();
                     line.close();
-                    alive = false; //drains, stops and closes line. returns alive = false to end thread
+                    alive = false; // drains, stops and closes line. returns alive = false to end thread
                 }
                 nextIn += oneSecond;
             }
@@ -199,8 +152,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
     public void keyTyped ( KeyEvent e ){}
     public void keyReleased ( KeyEvent e ){}
 
-    public synchronized boolean removeChunk()
-    {
+    public synchronized boolean removeChunk() {
         while(roomAvailable && !dataAvailable)
         {
             try
@@ -212,11 +164,14 @@ public class BoundedBuffer extends JFrame implements KeyListener
 
         while(nextOut != bufferSize && alive)
         {
-            if(paused == false)
-            {
-                bytesWritten += line.write(audioChunk, nextOut, bytesRead); //writes 10 seconds to audio (plays)
-                nextOut += oneSecond;
-            }
+            try {
+                // We need to wait for some time for thread to restart
+                Thread.sleep(1);
+                if (!PlayProgress.paused) {
+                    bytesWritten += line.write(audioChunk, nextOut, bytesRead); //writes 10 seconds to audio (plays)
+                    nextOut += oneSecond;
+                }
+            } catch (InterruptedException e) { }
         }
         nextOut = 0;
 

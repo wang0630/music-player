@@ -11,6 +11,7 @@ public abstract class AbstractThreading implements Runnable {
         boundedBuffer = bb;
     }
 
+    // The function which executes in the thread
     public void run() {
         while(alive) {
             alive = threadingAction();
