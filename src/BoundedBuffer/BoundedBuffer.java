@@ -1,5 +1,7 @@
 package BoundedBuffer;
 
+import PanelControl.*;
+
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
@@ -9,6 +11,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 
 public class BoundedBuffer extends JFrame implements KeyListener
 {
@@ -21,9 +24,9 @@ public class BoundedBuffer extends JFrame implements KeyListener
     private AudioFormat format;
     private DataLine.Info info;
     private SourceDataLine line;
-    float volume = 2.0f;
     private boolean paused = false;
     private boolean muted = false;
+
     // true indicates the data is ready to play
     private boolean dataAvailable = false;
     // true if the buffer still has spaces for data to be written
@@ -39,9 +42,14 @@ public class BoundedBuffer extends JFrame implements KeyListener
     private int bytesWritten;
     private byte[] audioChunk;
 
-    private JLabel l1;
-    private JLabel l2;
-    private JLabel l3;
+    // The keyEvent for the control
+    HashMap<Character, PanelControl> panelControlMap = new HashMap<Character, PanelControl>();
+
+
+    // Make labels static, allow PanelControl package to access it
+    public static JLabel l1;
+    public static JLabel l2;
+    public static JLabel l3;
 
     public BoundedBuffer() //GUI from player JFrame
     {
@@ -49,7 +57,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
         Panel p = new Panel();
         l1 = new JLabel ("NOW PLAYING: " + fileIn, SwingConstants.CENTER);
         l2 = new JLabel("<html><br/>MUSIC PLAYER CONTROLS<br/><br/> Stop: x <br/>Higher Volume: q <br/>Lower Volume: a <br/>Pause: p <br/>Resume: r <br/>Mute: m <br/>Unmute: u<br/><br/></html>", SwingConstants.CENTER);
-        l3 = new JLabel("CURRENT VOLUME: " + volume, SwingConstants.CENTER);
+        l3 = new JLabel("CURRENT VOLUME: " + 2.0f, SwingConstants.CENTER);
         p.add(l1);
         p.add(l2);
         p.add(l3);
@@ -64,6 +72,9 @@ public class BoundedBuffer extends JFrame implements KeyListener
                 System.exit(0);
             }
         });
+        // Add panelControl to the map
+        setPanelControlMap('f', new VolumeUp());
+        setPanelControlMap('d', new VolumeDown());
     }
 
     public void readFile() throws UnsupportedAudioFileException, IOException,  LineUnavailableException //reads in file, format and info
@@ -77,10 +88,18 @@ public class BoundedBuffer extends JFrame implements KeyListener
         line.start();
     }
 
+    private void setPanelControlMap(char key, PanelControl p) {
+        panelControlMap.put(key, p);
+    }
+
+    private void doPanelControl(char key) {
+
+        panelControlMap.get(key).execute(line);
+    }
+
     public void keyPressed (KeyEvent e) //checks for key presses
     {
         char control = e.getKeyChar();
-
         if(control == 'x') //ends program, returns alive = false, stops threads
         {
             l2.setText("Thanks");
@@ -89,35 +108,14 @@ public class BoundedBuffer extends JFrame implements KeyListener
             alive = false; //drains, stops and closes line. returns alive = false to end thread
         }
 
-        if(control == 'q') //increases volume, stops at 60.0f as it is the maximum value
+        if(control == 'f') //increases volume, stops at 60.0f as it is the maximum value
         {
-            FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-            if(volume == 6.0f)
-            {
-                l3.setText("MAX VOLUME REACHED!");
-            }
-            else
-            {
-                volume +=1.0f;
-                gainControl.setValue(volume);
-                l3.setText("CURRENT VOLUME: " + volume);
-            }
+            doPanelControl('f');
         }
 
         if(control == 'a') //decreases volume, stops at -80.0f as it is the minimum value
         {
-            FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
 
-            if(volume == -80.0f)
-            {
-                l3.setText("MINIMUM VOLUME REACHED!"); //update label with current volume
-            }
-            else
-            {
-                volume -=1.0f;
-                gainControl.setValue(volume);
-                l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
-            }
         }
 
         if(control == 'm') //mutes line until 'u' is entered
@@ -133,7 +131,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
             BooleanControl muteControl = (BooleanControl) line.getControl(BooleanControl.Type.MUTE);
             muteControl.setValue(false);
             muted = false;
-            l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
+//            l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
         }
 
         if(control == 'p') //pauses line, until 'r' is entered, make boolean paused = true
@@ -153,7 +151,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
             }
             else
             {
-                l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
+//                l3.setText("CURRENT VOLUME: " + volume); //update label with current volume
             }
         }
     }
@@ -173,7 +171,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
         try
         {
             audioChunk = new byte[bufferSize];
-
+            // If the chunk is full(10 secs), we break this while loop
             while(nextIn != bufferSize && alive)
             {
                 if((bytesRead = audioStream.read(audioChunk, nextIn, oneSecond)) == -1 && paused == false)//reads in 10 one second chunks, if nothing is read, terminate thread
@@ -191,8 +189,8 @@ public class BoundedBuffer extends JFrame implements KeyListener
         catch (IOException e) { }
 
         dataAvailable = true; // audio data is available to be written
-        roomAvailable = false; // no room for audio data to be read in
-        notifyAll(); // notify threads
+        roomAvailable = false; // no room for audio data to be read in, buffer is full
+        notifyAll(); // // notify threads which are waiting
 
         return alive; // alive, thread will loop if true
     }
@@ -224,7 +222,7 @@ public class BoundedBuffer extends JFrame implements KeyListener
 
         dataAvailable = false; //audio data is not available to be written
         roomAvailable = true; //room for audio data to be read in is available
-        notifyAll(); //notify threads
+        notifyAll(); // notify threads which are waiting
 
         return alive; // alive, thread will loop if true
     }
